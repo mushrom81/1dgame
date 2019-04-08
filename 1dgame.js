@@ -4,111 +4,204 @@ c.width = 720;
 c.height = 480;
 
 var ctx = c.getContext("2d");
-var genereationArray = [0,1,1,1,1,1,1,1,1,1,2,2,3,3,3];
 
-function random(max) { return Math.floor(Math.random() * max); }
+function randInt(max) {
+    return Math.floor(Math.random() * max);
+}
 
-function terrain() { return genereationArray[random(genereationArray.length)]; }
+function f(x) {
+    if (x > 0) return 1;
+    if (x < 0) return -1;
+    return 0;
+}
 
-class Map {
+class World {
     constructor(size) {
-        this._field = [];
-        this._light = [];
-        this._recentDirection = 1;
-        this._miningDelay = 0;
-        this._camera = size / 2 - 361;
+        this._terrain = [];
+        this._lighting = [];
+        var generation = [0,1,1,1,1,1,1,1,2,2,3,3,3];
         for (var i = 0; i < size; i++) {
-            this._field.push(terrain());
-            this._light.push(0);
+            this._terrain.push(generation[randInt(generation.length)]);
+            this._lighting.push(1);
         }
-        for (var i = -2; i < 2; i++) {
-            this._field[size / 20 + i] = 0;
-            this._light[size / 20 + i] = 1;
+        for (var i = size / 2 - 2; i < size / 2 + 2; i++) {
+            this._terrain[i] = 0;
         }
-        for (var i = -10; i <= 10; i++) {
-            this._light[Math.floor(this.playerPos) + i] = 1;
-        }
-    }
-    
-    get field() { return this._field; }
-    get camera() { return this._camera; }
-    get playerPos() { return (this._camera + 359) / 10; }
-    get recentDirection() { return this._recentDirection; }
-    get miningDelay() { return this._miningDelay; }
-    set miningDelay(value) { this._miningDelay = value; }
-
-    move(direction) {
-        if (keys["UpDown"] <= 0) this._recentDirection = direction;
-        this._camera += direction;
-        if (this._field[Math.floor(this.playerPos)] == 3) console.log("owch");
-        if (this._field[Math.floor(this.playerPos)] != 0 && this._field[Math.floor(this.playerPos)] != 3 ) this._camera -= direction; 
-        for (var i = -10; i <= 10; i++) {
-            this._light[Math.floor(this.playerPos) + i] = 1;
-        }
-        this._miningDelay = 0;
+        this._terrain[size / 2] = 4;
+        this._player = new Entity(this, size / 2);
+        this._portals = [];
+        this._zombies = [];
     }
 
-    breakBlock() {
-        this._field[Math.floor(this.playerPos) + this._recentDirection] = 0;
+    get terrain() { return this._terrain; }
+    set terrain(value) { this._terrain = value; }
+    get lighting() { return this._lighting; }
+    set lighting(value) { this._lighting = value; }
+    get player() { return this._player; }
+    get zombies() { return this._zombies; }
+    set zombies(value) { this._zombies = value; }
+}
+
+class Entity {
+    constructor(nest, position) {
+        this._position = position;
+        this._health = 20;
+        this._nest = nest;
+        this._direction = 1;
+        this._ticksNotMoving = 0;
+        this._inventory = [0, 0];
+    }
+
+    get inventory() { return this._inventory; }
+    set inventory(value) { this._inventory = value; }
+    get position() { return this._position; }
+    get dead() { return this._health <= 0; }
+    get health() { return this._health; }
+    set health(value) { this._health = value; }
+    get direction() { return this._direction; }
+    get ticksNotMoving() { return this._ticksNotMoving; }
+    set ticksNotMoving(value) { this._ticksNotMoving = value; }
+
+    move(distance) {
+        if (this._health > 0) {
+            this._position += distance;
+            var block = this._nest.terrain[Math.floor(this._position)];
+            if (block != 0 && block != 3 && block != 4) this._position -= distance;
+            else this._ticksNotMoving = 0;
+        }
+        this._direction = f(distance);
+    }
+
+    damage(direction) {
+        this._health--;
+        if (f(direction == 1)) {
+            this.move(-0.1);
+            this.move(-0.1);
+            this.move(-0.1);
+            this.move(-0.1);
+            this.move(-0.1);
+        }
+        else {
+            this.move(0.1);
+            this.move(0.1);
+            this.move(0.1);
+            this.move(0.1);
+            this.move(0.1);
+        }
     }
 }
-let Game = new Map(10000);
 
-function drawpx(location, color) {
-    ctx.fillStyle = color;
-    ctx.fillRect(location, 238, 1, 5);
-}
+var game = new World(10000);
 
 let keys = {};
 onkeydown = onkeyup = function(e){
     e = e || window.event;
-    if (e.key == "ArrowUp" && e.type == "keydown" && keys["ArrowUp"] == false) keys["UpDown"] = 10;
-    keys[e.key] = (e.type == "keydown");
+    if (keys["o"] == true) keys["o"] = false;
+    else keys[e.key] = (e.type == 'keydown');
+}
+
+function fillRect(x, y, width, height, color = "black") {
+    ctx.fillStyle = color;
+    ctx.fillRect(x, y, width, height);
+}
+
+function px(position, color = "black") {
+    fillRect(position, 238, 1, 5, color);
+}
+
+function renderTerrain(game) {
+    var colors = ["white", "gray", "gold", "red", "brown"];
+    for (var i = 0; i < 720; i += 1) {
+        if (game.lighting[Math.floor(game.player.position + (i / 10 - 36))] == 1) {
+            px(i, colors[game.terrain[Math.floor(game.player.position + (i / 10 - 36))]]);
+        }
+    }
+}
+
+function renderEntities(game) {
+    px(360);
+    for (var i = 0; i < game.zombies.length; i++) {
+        px(game.zombies[i].position * 10 - game.player.position * 10 + 360, "green");
+    }
+}
+
+function renderHotbar(game) {
+    ctx.fillStyle = "white";
+    ctx.font = "30px sans-serif";
+    ctx.fillText("HP: " + game.player.health.toString(), 10, 40);
+    ctx.fillText("ST: " + game.player.inventory[0].toString(), 10, 80);
+    ctx.fillText("GL: " + game.player.inventory[1].toString(), 10, 120);
+}
+
+function moveZombies(game) {
+    for (var i = 0; i < game.zombies.length; i++) {
+        var direction = -f(game.zombies[i].position - game.player.position);
+        game.zombies[i].move(direction / 40);
+        if (Math.abs(game.player.position - game.zombies[i].position) < 0.1) {
+            game.player.damage(-direction);
+            for (var j = 0; j < 5; j++) {
+                game.zombies[i].move(-direction / 10);
+            }
+        }
+    }
+}
+
+function attack(game) {
+    for (var i = 0; i < game.zombies.length; i++) {
+        if (Math.abs(game.zombies[i].position - game.player.position) < 0.5 && f(game.zombies[i].position - game.player.position) == f(game.player.direction)) {
+            game.zombies[i].damage(0 - f(game.player.direction));
+            break;
+        }
+    }
+}
+
+function mineBlock(game) {
+    for (var i = 1; i <= 2; i++) {
+        var block = game.terrain[Math.floor(game.player.position) + i * f(game.player.direction)];
+        if (block != 3 && block != 4) {
+            switch (block) {
+                case 0:
+                    game.player.health++;
+                    if (game.player.health > 20) game.player.health = 20;
+                break;
+                case 1:
+                    if (Math.random() < 0.2) game.player.inventory[0]++;
+                break;
+                case 2:
+                    while (Math.random() < 0.2) { game.player.inventory[1]++; }
+                break;
+            }
+            game.terrain[Math.floor(game.player.position) + i * f(game.player.direction)] = 0;
+            break;
+        }
+    }
+}
+
+function placeBlock(game) {
+    var block = game.terrain[Math.floor(game.player.position) + f(game.player.direction)];
+    if (block != 1 && block != 2 && block != 4 && game.player.inventory[0] > 0) {
+        game.terrain[Math.floor(game.player.position) + f(game.player.direction)] = 1;
+        game.player.inventory[0]--;
+    }
 }
 
 function loop() {
     requestAnimationFrame(loop);
-    if (keys["ArrowLeft"]) Game.move(-1);
-    if (keys["ArrowRight"]) Game.move(1);
-    ctx.fillStyle = "black";
-    ctx.fillRect(0, 0, c.width, c.height);
-    ctx.fillStyle = "white";
-    ctx.fillRect(0, 238, c.width, 5);
-    for (var i = 0; i < 720; i++) {
-        var block = Math.floor((i + Game.camera) / 10);
-        switch (Game.field[block]) {
-            case 0: // Air  
-                drawpx(i, "white"); 
-            break;
-            case 1: // Block
-                drawpx(i, "gray");
-            break;
-            case 2: // Ore
-                drawpx(i, "gold");
-            break;
-            case 3: // Lava
-                drawpx(i, "red");
-            break;
-        }
-        if (Game._light[block] == 0) {
-            drawpx(i, "black");
-        }
+    fillRect(0, 0, c.width, c.height);
+    renderTerrain(game);
+    renderEntities(game);
+    renderHotbar(game);
+    if (keys["d"]) game.player.move(0.1);
+    if (keys["a"]) game.player.move(-0.1);
+    if (keys["o"]) attack(game);
+    if (keys["k"]) game.player.ticksNotMoving++;
+    else game.player.ticksNotMoving = 0;
+    if (game.player.ticksNotMoving == 100) {
+        mineBlock(game);
+        game.player.ticksNotMoving = 0;
     }
-    drawpx(359, "black");
-    if (keys["UpDown"] > 0) {
-        keys["UpDown"]--;
-        var center = 359;
-        for (i = 0; i < 5; i++) {
-            center += Game.recentDirection;
-            drawpx(center, "red");            
-        }
-    }
-    else if (keys["ArrowUp"]) {
-        Game.miningDelay++;
-        if (Game.miningDelay % 50 == 0) {
-            Game.breakBlock();
-        }
-
-    }
+    if (keys["p"]) placeBlock(game);
+    if (game.terrain[Math.floor(game.player.position)] == 3) game.player.health--;
+    moveZombies(game);
 }
 loop();
