@@ -13,17 +13,30 @@
                 display: inline;
             }
 
-            div {
+            #container   {
                 width: 100%;
                 text-align: center;
             }
             
         </style>
+        <title>1D Game</title>
     </head>
     <body>
-        <div>
+        <div id="container">
             <canvas>Your browser doesn't support canvas.</canvas>
         </div>
+        <h2>Dig, fight and explore, all on a single demensional plane!</h2>
+        <h4>Controls:</h4>
+        <div>A,D: move</div>
+        <div>O: mine</div>
+        <div>K: attack</div>
+        <div>P: place block</div>
+        <div>I: place portal</div>
+        <h4>Tips:</h4>
+        <div>If you stand next to lava, you can mine what is on the other side of it</div>
+        <div>Bridge gaps of lava by filling them with stone, you can also dash across if you are fast enough</div>
+        <div>Unlock the power of teleportation by bringing 20 gold back to your spawn point</div>
+        <div>The O button doubles as a way to heal when there is nothing to mine</div>
         <script src="1dgame.js"></script>
     </body>
 </html>
